@@ -39,6 +39,8 @@ vtest/Pictures
 .vs
 .vscode
 dependencies
+.tags
+.tags_sorted_by_file
 
 # Downloaded files during build process
 MuseScore_General.sf3

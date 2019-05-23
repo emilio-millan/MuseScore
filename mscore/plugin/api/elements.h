@@ -22,6 +22,7 @@
 #include "libmscore/notedot.h"
 #include "libmscore/segment.h"
 #include "libmscore/accidental.h"
+#include "libmscore/tie.h"
 
 namespace Ms {
 namespace PluginAPI {
@@ -337,6 +338,25 @@ class Element : public Ms::PluginAPI::ScoreElement {
       };
 
 //---------------------------------------------------------
+//   Tie
+//    Tie wrapper
+//---------------------------------------------------------
+
+class Tie : public Element {
+      Q_OBJECT
+
+   public:
+      /// \cond MS_INTERNAL
+      Tie(Ms::Tie* t = nullptr, Ownership own = Ownership::SCORE)
+         : Element(t, own) {}
+
+      Ms::Tie* tie() { return toTie(e); }
+      const Ms::Tie* tie() const { return toTie(e); }
+
+      /// \endcond
+      };
+
+//---------------------------------------------------------
 //   Note
 //    Note wrapper
 //---------------------------------------------------------
@@ -361,8 +381,13 @@ class Note : public Element {
 //       Q_PROPERTY(bool                           small             READ small              WRITE undoSetSmall)
 //       Q_PROPERTY(int                            string            READ string             WRITE undoSetString)
 //       Q_PROPERTY(int                            subchannel        READ subchannel)
-//       Q_PROPERTY(Ms::Tie*                       tieBack           READ tieBack)
-//       Q_PROPERTY(Ms::Tie*                       tieFor            READ tieFor)
+
+      Q_PROPERTY(Ms::PluginAPI::Tie*                       tieBack           READ tieBack)
+      Q_PROPERTY(Ms::PluginAPI::Tie*                       tieFor            READ tieFor)
+
+      Q_PROPERTY(bool isTiedBack READ isTiedBack)
+      Q_PROPERTY(bool isTiedForward READ isTiedForward)
+
       /** MIDI pitch of this note */
       API_PROPERTY_T( int, pitch,                   PITCH                     )
       /**
@@ -406,6 +431,15 @@ class Note : public Element {
 
       Ms::AccidentalType accidentalType() { return note()->accidentalType(); }
       void setAccidentalType(Ms::AccidentalType t) { note()->setAccidentalType(t); }
+
+      Ms::PluginAPI::Tie* tieFor() const { return wrap<Tie>(note()->tieFor()); }
+      Ms::PluginAPI::Tie* tieBack() const { return wrap<Tie>(note()->tieBack()); }
+
+      Q_INVOKABLE void add(Ms::PluginAPI::Element* el) { note()->add(el->element()); }
+
+      bool isTiedForward() const { return (note()->tieFor() != nullptr); }
+      bool isTiedBack() const { return (note()->tieBack() != nullptr); }
+
       /// \endcond
       };
 
