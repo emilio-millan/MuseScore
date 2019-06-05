@@ -3889,7 +3889,7 @@ void Score::layoutSystemElements(System* system, LayoutContext& lc)
             }
 
       //-------------------------------------------------------------
-      // layout articulations, tuplet
+      // layout articulations
       //-------------------------------------------------------------
 
       for (Segment* s : sl) {
@@ -3903,15 +3903,24 @@ void Score::layoutSystemElements(System* system, LayoutContext& lc)
                         c->layoutArticulations();
                         c->layoutArticulations2();
                         }
-                  // tuplets
+                  }
+            }
+
+      //-------------------------------------------------------------
+      // layout tuplets
+      //-------------------------------------------------------------
+
+      for (Segment* s : sl) {
+            for (Element* e : s->elist()) {
+                  if (!e || !e->isChordRest() || !score()->staff(e->staffIdx())->show())
+                        continue;
+                  ChordRest* cr = toChordRest(e);
                   if (!isTopTuplet(cr))
                         continue;
                   DurationElement* de = cr;
                   while (de->tuplet() && de->tuplet()->elements().front() == de) {
                         Tuplet* t = de->tuplet();
                         t->layout();
-                        if (t->addToSkyline())
-                              system->staff(t->staffIdx())->skyline().add(t->shape().translated(t->pos() + t->measure()->pos()));
                         de = t;
                         }
                   }
