@@ -507,6 +507,7 @@ void Segment::add(Element* el)
             case ElementType::TAB_DURATION_SYMBOL:
             case ElementType::FIGURED_BASS:
             case ElementType::FERMATA:
+            case ElementType::STICKING:
             case ElementType::FINGERING:
                   _annotations.push_back(el);
                   break;
@@ -661,6 +662,7 @@ void Segment::remove(Element* el)
             case ElementType::TEXT:
             case ElementType::TREMOLOBAR:
             case ElementType::FERMATA:
+            case ElementType::STICKING:
             case ElementType::FINGERING:
                   removeAnnotation(el);
                   break;
@@ -1501,7 +1503,8 @@ Element* Segment::nextElement(int activeStaff)
             case ElementType::TAB_DURATION_SYMBOL:
             case ElementType::FIGURED_BASS:
             case ElementType::STAFF_STATE:
-            case ElementType::INSTRUMENT_CHANGE: {
+            case ElementType::INSTRUMENT_CHANGE:
+            case ElementType::STICKING: {
                   Element* next = nextAnnotation(e);
                   if (next)
                         return next;
@@ -1607,7 +1610,8 @@ Element* Segment::prevElement(int activeStaff)
             case ElementType::TAB_DURATION_SYMBOL:
             case ElementType::FIGURED_BASS:
             case ElementType::STAFF_STATE:
-            case ElementType::INSTRUMENT_CHANGE: {
+            case ElementType::INSTRUMENT_CHANGE:
+            case ElementType::STICKING: {
                   Element* prev = prevAnnotation(e);
                   if (prev)
                         return prev;
