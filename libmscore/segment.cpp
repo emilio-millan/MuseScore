@@ -508,6 +508,7 @@ void Segment::add(Element* el)
             case ElementType::FIGURED_BASS:
             case ElementType::FERMATA:
             case ElementType::STICKING:
+            case ElementType::FINGERING:
                   _annotations.push_back(el);
                   break;
 
@@ -662,6 +663,7 @@ void Segment::remove(Element* el)
             case ElementType::TREMOLOBAR:
             case ElementType::FERMATA:
             case ElementType::STICKING:
+            case ElementType::FINGERING:
                   removeAnnotation(el);
                   break;
 
@@ -901,7 +903,7 @@ bool Segment::setProperty(Pid propertyId, const QVariant& v)
             case Pid::LEADING_SPACE:
                   setExtraLeadingSpace(v.value<Spatium>());
                   for (Element* e : _elist) {
-                        if(e) 
+                        if(e)
                               e->setGenerated(false);
                         }
                   break;
