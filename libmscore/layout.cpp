@@ -3717,7 +3717,7 @@ void Score::layoutSystemElements(System* system, LayoutContext& lc)
                                     int effectiveTrack = e->vStaffIdx() * VOICES + e->voice();
                                     if (effectiveTrack < strack || effectiveTrack >= etrack)
                                           continue;
-
+#if 0
                                     // clear layout for chord-based fingerings
                                     // do this before adding chord to skyline
                                     if (e->isChord()) {
@@ -3741,7 +3741,7 @@ void Score::layoutSystemElements(System* system, LayoutContext& lc)
                                                       }
                                                 }
                                           }
-
+#endif
                                     // add element to skyline
                                     if (e->addToSkyline())
                                           skyline.add(e->shape().translated(e->pos() + p));
@@ -3806,7 +3806,13 @@ void Score::layoutSystemElements(System* system, LayoutContext& lc)
                               f->layout();
                               if (f->addToSkyline()) {
                                     Note* n = f->note();
-                                    QRectF r = f->bbox().translated(f->pos() + n->pos() + n->chord()->pos() + s->pos() + s->measure()->pos());
+                                    QRectF r = f->bbox().translated(f->pos() + n->pos() + n->chord()->pos());
+                                    // segment shapes were regenerated for beamed notes
+                                    // fingering shape was lost since it was cleared above
+                                    // so add it back now
+                                    if (n->chord()->beam())
+                                          n->chord()->segment()->staffShape(n->chord()->vStaffIdx()).add(r);
+                                    r.translate(s->pos() + s->measure()->pos());
                                     system->staff(f->note()->chord()->vStaffIdx())->skyline().add(r);
                                     }
                               }
