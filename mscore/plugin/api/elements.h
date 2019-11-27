@@ -23,11 +23,18 @@
 #include "libmscore/segment.h"
 #include "libmscore/accidental.h"
 #include "libmscore/tie.h"
+#include "libmscore/musescoreCore.h"
+#include "libmscore/score.h"
+#include "libmscore/undo.h"
+#include "playevent.h"
+#include "libmscore/types.h"
 
 namespace Ms {
 namespace PluginAPI {
 
 class Element;
+class Tie;
+extern Tie* tieWrap(Ms::Tie* tie);
 
 //---------------------------------------------------------
 //   wrap
@@ -70,6 +77,11 @@ class Element : public Ms::PluginAPI::ScoreElement {
       Q_OBJECT
 
       /**
+       * Parent element for this element.
+       * \since 3.3
+       */
+      Q_PROPERTY(Ms::PluginAPI::Element* parent READ parent)
+      /**
        * X-axis offset from a reference position in spatium units.
        * \see Element::offset
        */
@@ -79,6 +91,38 @@ class Element : public Ms::PluginAPI::ScoreElement {
        * \see Element::offset
        */
       Q_PROPERTY(qreal offsetY READ offsetY WRITE setOffsetY)
+      /**
+       * Reference position of this element relative to its parent element.
+       *
+       * This is an offset from the parent object that is determined by the 
+       * autoplace feature. It includes any other offsets applied to the 
+       * element. You can use this value to accurately position other elements 
+       * related to the same parent.
+       *
+       * This value is in spatium units for compatibility with Element.offsetX.
+       * \since MuseScore 3.3
+       */
+      Q_PROPERTY(qreal posX READ posX)
+      /**
+       * Reference position of this element relative to its parent element.
+       *
+       * This is an offset from the parent object that is determined by the 
+       * autoplace feature. It includes any other offsets applied to the 
+       * element. You can use this value to accurately position other elements 
+       * related to the same parent.
+       *
+       * This value is in spatium units for compatibility with Element.offsetY.
+       * \since MuseScore 3.3
+       */
+      Q_PROPERTY(qreal posY READ posY)
+
+      /**
+       * Bounding box of this element.
+       *
+       * This value is in spatium units for compatibility with other Element positioning properties.
+       * \since MuseScore 3.3.1
+       */
+      Q_PROPERTY(QRectF bbox READ bbox)
 
       API_PROPERTY( subtype,                 SUBTYPE                   )
       API_PROPERTY_READ_ONLY_T( bool, selected, SELECTED               )
@@ -257,7 +301,7 @@ class Element : public Ms::PluginAPI::ScoreElement {
       API_PROPERTY( stepOffset,              STEP_OFFSET               )
       API_PROPERTY( staffShowBarlines,       STAFF_SHOW_BARLINES       )
       API_PROPERTY( staffShowLedgerlines,    STAFF_SHOW_LEDGERLINES    )
-      API_PROPERTY( staffSlashStyle,         STAFF_SLASH_STYLE         )
+      API_PROPERTY( staffStemless,           STAFF_STEMLESS            )
       API_PROPERTY( staffNoteheadScheme,     STAFF_NOTEHEAD_SCHEME     )
       API_PROPERTY( staffGenClef,            STAFF_GEN_CLEF            )
       API_PROPERTY( staffGenTimesig,         STAFF_GEN_TIMESIG         )
@@ -317,6 +361,13 @@ class Element : public Ms::PluginAPI::ScoreElement {
       void setOffsetX(qreal offX);
       void setOffsetY(qreal offY);
 
+      qreal posX() const { return element()->pos().x() / element()->spatium(); }
+      qreal posY() const { return element()->pos().y() / element()->spatium(); }
+
+      Ms::PluginAPI::Element* parent() const { return wrap(element()->parent()); }
+
+      QRectF bbox() const;
+
    public:
       /// \cond MS_INTERNAL
       Element(Ms::Element* e = nullptr, Ownership own = Ownership::PLUGIN)
@@ -368,6 +419,11 @@ class Note : public Element {
       Q_PROPERTY(QQmlListProperty<Ms::PluginAPI::Element>  dots              READ dots)
 //       Q_PROPERTY(int                            dotsCount         READ qmlDotsCount)
       Q_PROPERTY(QQmlListProperty<Ms::PluginAPI::Element>  elements          READ elements)
+      /// List of PlayEvents associated with this note.
+      /// Important: You must call Score.createPlayEvents()
+      /// to see meaningful data in the PlayEvent lists.
+      /// \since MuseScore 3.3
+      Q_PROPERTY(QQmlListProperty<Ms::PluginAPI::PlayEvent> playEvents READ playEvents)
 //       Q_PROPERTY(int                            fret              READ fret               WRITE undoSetFret)
 //       Q_PROPERTY(bool                           ghost             READ ghost              WRITE undoSetGhost)
 //       Q_PROPERTY(Ms::NoteHead::Group            headGroup         READ headGroup          WRITE undoSetHeadGroup)
@@ -381,6 +437,20 @@ class Note : public Element {
 //       Q_PROPERTY(bool                           small             READ small              WRITE undoSetSmall)
 //       Q_PROPERTY(int                            string            READ string             WRITE undoSetString)
 //       Q_PROPERTY(int                            subchannel        READ subchannel)
+      /// Backward tie for this Note.
+      /// \since MuseScore 3.3
+      Q_PROPERTY(Ms::PluginAPI::Tie*               tieBack           READ tieBack)
+      /// Forward tie for this Note.
+      /// \since MuseScore 3.3
+      Q_PROPERTY(Ms::PluginAPI::Tie*               tieForward        READ tieForward)
+      /// The first note of a series of ties to this note.
+      /// This will return the calling note if there is not tieBack.
+      /// \since MuseScore 3.3
+      Q_PROPERTY(Ms::PluginAPI::Note*              firstTiedNote     READ firstTiedNote)
+      /// The last note of a series of ties to this note.
+      /// This will return the calling note if there is not tieForward.
+      /// \since MuseScore 3.3
+      Q_PROPERTY(Ms::PluginAPI::Note*              lastTiedNote      READ lastTiedNote)
       /// The NoteType of the note.
       /// \since MuseScore 3.2.1
       Q_PROPERTY(Ms::NoteType                      noteType          READ noteType)
@@ -427,8 +497,15 @@ class Note : public Element {
       int tpc() const { return note()->tpc(); }
       void setTpc(int val);
 
-      QQmlListProperty<Element> dots()     { return wrapContainerProperty<Element>(this, note()->dots()); }
+      Ms::PluginAPI::Tie* tieBack()    const { return note()->tieBack() != nullptr ? tieWrap(note()->tieBack()) : nullptr; }
+      Ms::PluginAPI::Tie* tieForward() const { return note()->tieFor() != nullptr ? tieWrap(note()->tieFor()) : nullptr; }
+
+      Ms::PluginAPI::Note* firstTiedNote() { return wrap<Note>(note()->firstTiedNote()); }
+      Ms::PluginAPI::Note* lastTiedNote()  { return wrap<Note>(note()->lastTiedNote()); }
+
+      QQmlListProperty<Element> dots() { return wrapContainerProperty<Element>(this, note()->dots()); }
       QQmlListProperty<Element> elements() { return wrapContainerProperty<Element>(this, note()->el());   }
+      QQmlListProperty<PlayEvent> playEvents() { return wrapPlayEventsContainerProperty(this, note()->playEvents()); }
 
       Element* accidental() { return wrap<Element>(note()->accidental()); }
 
@@ -436,14 +513,29 @@ class Note : public Element {
       void setAccidentalType(Ms::AccidentalType t) { note()->setAccidentalType(t); }
       Ms::NoteType noteType() { return note()->noteType(); }
 
+#if 0
       Ms::PluginAPI::Tie* tieFor() const { return wrap<Tie>(note()->tieFor()); }
       Ms::PluginAPI::Tie* tieBack() const { return wrap<Tie>(note()->tieBack()); }
+#endif
 
       Q_INVOKABLE void add(Ms::PluginAPI::Element* el) { note()->add(el->element()); }
 
       bool isTiedForward() const { return (note()->tieFor() != nullptr); }
       bool isTiedBack() const { return (note()->tieBack() != nullptr); }
+      static void addInternal(Ms::Note* note, Ms::Element* el);
+      static bool isChildAllowed(Ms::ElementType elementType);
       /// \endcond
+
+      /// Creates a PlayEvent object for use in Javascript.
+      /// \since MuseScore 3.3
+      Q_INVOKABLE Ms::PluginAPI::PlayEvent* createPlayEvent() { return playEventWrap(new NoteEvent(), nullptr); }
+
+      /// Add to a note's elements.
+      /// \since MuseScore 3.3.3
+      Q_INVOKABLE void add(Ms::PluginAPI::Element* wrapped);
+      /// Remove a note's element.
+      /// \since MuseScore 3.3.3
+      Q_INVOKABLE void remove(Ms::PluginAPI::Element* wrapped);
       };
 
 //---------------------------------------------------------
@@ -463,6 +555,9 @@ class Chord : public Element {
       /// The NoteType of the chord.
       /// \since MuseScore 3.2.1
       Q_PROPERTY(Ms::NoteType                              noteType   READ noteType)
+      /// The PlayEventType of the chord.
+      /// \since MuseScore 3.3
+      Q_PROPERTY(Ms::PlayEventType                    playEventType   READ playEventType WRITE setPlayEventType)
 
    public:
       /// \cond MS_INTERNAL
@@ -480,7 +575,18 @@ class Chord : public Element {
       //QQmlListProperty<Element> beam()         { return wrapContainerProperty<Element>(this, chord()->beam());      }
       //QQmlListProperty<Element> hook()         { return wrapContainerProperty<Element>(this, chord()->hook());      }
       Ms::NoteType noteType()                  { return chord()->noteType(); }
+      Ms::PlayEventType playEventType()        { return chord()->playEventType(); }
+      void setPlayEventType(Ms::PlayEventType v);
+
+      static void addInternal(Ms::Chord* chord, Ms::Element* el);
       /// \endcond
+
+      /// Add to a chord's elements.
+      /// \since MuseScore 3.3
+      Q_INVOKABLE void add(Ms::PluginAPI::Element* wrapped);
+      /// Remove a chord's element.
+      /// \since MuseScore 3.3
+      Q_INVOKABLE void remove(Ms::PluginAPI::Element* wrapped);
       };
 
 //---------------------------------------------------------
@@ -563,6 +669,10 @@ class Measure : public Element {
       Q_PROPERTY(Ms::PluginAPI::Measure* prevMeasure       READ prevMeasure)
 //       Q_PROPERTY(Ms::Measure* prevMeasureMM     READ prevMeasureMM)
 
+      /// List of measure-related elements: layout breaks, jump/repeat markings etc.
+      /// \since MuseScore 3.3
+      Q_PROPERTY(QQmlListProperty<Ms::PluginAPI::Element> elements READ elements)
+
    public:
       /// \cond MS_INTERNAL
       Measure(Ms::Measure* m = nullptr, Ownership own = Ownership::SCORE)
@@ -576,6 +686,8 @@ class Measure : public Element {
 
       Measure* prevMeasure() { return wrap<Measure>(measure()->prevMeasure(), Ownership::SCORE); }
       Measure* nextMeasure() { return wrap<Measure>(measure()->nextMeasure(), Ownership::SCORE); }
+
+      QQmlListProperty<Element> elements() { return wrapContainerProperty<Element>(this, measure()->el()); }
       /// \endcond
       };
 

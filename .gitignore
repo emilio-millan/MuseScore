@@ -37,7 +37,6 @@ vtest/META-INF
 vtest/Thumbnails
 vtest/Pictures
 .vs
-.vscode
 dependencies
 .tags
 .tags_sorted_by_file

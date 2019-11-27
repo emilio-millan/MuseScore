@@ -180,6 +180,19 @@ void System::removeStaff(int idx)
       }
 
 //---------------------------------------------------------
+//   adjustStavesNumber
+//---------------------------------------------------------
+
+void System::adjustStavesNumber(int nstaves)
+      {
+      for (int i = _staves.size(); i < nstaves; ++i)
+            insertStaff(i);
+      const int dn = _staves.size() - nstaves;
+      for (int i = 0; i < dn; ++i)
+            removeStaff(_staves.size() - 1);
+      }
+
+//---------------------------------------------------------
 //   layoutSystem
 ///   Layout the System
 //---------------------------------------------------------
@@ -1150,7 +1163,7 @@ Element* System::nextSegmentElement()
             if (firstSeg)
                   return firstSeg->element(0);
             }
-      return score()->firstElement();
+      return score()->lastElement();
       }
 
 //---------------------------------------------------------
@@ -1164,7 +1177,7 @@ Element* System::prevSegmentElement()
       while (!re) {
             seg = seg->prev1MM();
             if (!seg)
-                  return score()->lastElement();
+                  return score()->firstElement();
 
             if (seg->segmentType() == SegmentType::EndBarLine)
                   score()->inputState().setTrack((score()->staves().size() - 1) * VOICES); //corection

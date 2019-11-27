@@ -949,6 +949,28 @@ ElementType Element::readType(XmlReader& e, QPointF* dragOffset,
       }
 
 //---------------------------------------------------------
+//   readMimeData
+//---------------------------------------------------------
+
+Element* Element::readMimeData(Score* score, const QByteArray& data, QPointF* dragOffset, Fraction* duration)
+      {
+      XmlReader e(data);
+      const ElementType type = Element::readType(e, dragOffset, duration);
+      e.setPasteMode(true);
+
+      if (type == ElementType::INVALID) {
+            qDebug("cannot read type");
+            return nullptr;
+            }
+
+      Element* el = Element::create(type, score);
+      if (el)
+            el->read(e);
+
+      return el;
+      }
+
+//---------------------------------------------------------
 //   add
 //---------------------------------------------------------
 
@@ -1787,7 +1809,17 @@ bool Element::isUserModified() const
 void Element::triggerLayout() const
       {
       if (parent())
-            score()->setLayout(tick());
+            score()->setLayout(tick(), staffIdx(), this);
+      }
+
+//---------------------------------------------------------
+//   triggerLayoutAll
+//---------------------------------------------------------
+
+void Element::triggerLayoutAll() const
+      {
+      if (parent())
+            score()->setLayoutAll(staffIdx(), this);
       }
 
 //---------------------------------------------------------

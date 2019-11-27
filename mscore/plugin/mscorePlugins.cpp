@@ -381,8 +381,8 @@ bool MuseScore::loadPlugin(const QString& filename)
                   PluginDescription* p = new PluginDescription;
                   p->path = path;
                   p->load = false;
-                  collectPluginMetaInformation(p);
-                  registerPlugin(p);
+                  if (collectPluginMetaInformation(p))
+                        registerPlugin(p);
                   result = true;
                   }
             }
@@ -401,7 +401,7 @@ void MuseScore::pluginTriggered(int idx)
 
 void MuseScore::pluginTriggered(QString pp)
       {
-      QQmlEngine* engine = getPluginEngine();
+      QmlPluginEngine* engine = getPluginEngine();
 
       QQmlComponent component(engine);
       component.loadUrl(QUrl::fromLocalFile(pp));
@@ -422,11 +422,15 @@ void MuseScore::pluginTriggered(QString pp)
             delete obj;
             return;
             }
-      p->setFilePath(pp.section('/', 0, -2));
 
       if (p->pluginType() == "dock" || p->pluginType() == "dialog") {
             QQuickView* view = new QQuickView(engine, 0);
             view->setSource(QUrl::fromLocalFile(pp));
+            if (QmlPlugin* viewPluginInstance = qobject_cast<QmlPlugin*>(view->rootObject())) {
+                  // a new plugin instance was created by view, use it instead.
+                  delete p;
+                  p = viewPluginInstance;
+                  }
             view->setTitle(p->menuPath().mid(p->menuPath().lastIndexOf(".") + 1));
             view->setColor(QApplication::palette().color(QPalette::Window));
             //p->setParentItem(view->contentItem());
@@ -434,7 +438,7 @@ void MuseScore::pluginTriggered(QString pp)
             //view->setHeight(p->height());
             view->setResizeMode(QQuickView::SizeRootObjectToView);
             if (p->pluginType() == "dock") {
-                  QDockWidget* dock = new QDockWidget("Plugin", 0);
+                  QDockWidget* dock = new QDockWidget(view->title(), 0);
                   dock->setAttribute(Qt::WA_DeleteOnClose);
                   Qt::DockWidgetArea area = Qt::RightDockWidgetArea;
                   if (p->dockArea() == "left")
@@ -446,6 +450,12 @@ void MuseScore::pluginTriggered(QString pp)
                   QWidget* w = QWidget::createWindowContainer(view);
                   dock->setWidget(w);
                   addDockWidget(area, dock);
+                  const Qt::Orientation orientation =
+                     (area == Qt::RightDockWidgetArea || area == Qt::LeftDockWidgetArea)
+                     ? Qt::Vertical
+                     : Qt::Horizontal;
+                  const int size = (orientation == Qt::Vertical) ? view->initialSize().height() : view->initialSize().width();
+                  resizeDocks({ dock }, { size }, orientation);
                   connect(engine, SIGNAL(quit()), dock, SLOT(close()));
                   dock->show();
                   }
@@ -454,6 +464,10 @@ void MuseScore::pluginTriggered(QString pp)
                   view->show();
                   }
             }
+
+      connect(engine, &QmlPluginEngine::endCmd, p, &QmlPlugin::endCmd);
+
+      p->setFilePath(pp.section('/', 0, -2));
 
       // don’t call startCmd for non modal dialog
       if (cs && p->pluginType() != "dock")
@@ -466,9 +480,11 @@ void MuseScore::pluginTriggered(QString pp)
 
 //---------------------------------------------------------
 //   collectPluginMetaInformation
+///   returns false if loading a plugin for the given
+///   description has failed
 //---------------------------------------------------------
 
-void collectPluginMetaInformation(PluginDescription* d)
+bool collectPluginMetaInformation(PluginDescription* d)
       {
       qDebug("Collect meta for <%s>", qPrintable(d->path));
 
@@ -479,14 +495,16 @@ void collectPluginMetaInformation(PluginDescription* d)
             foreach(QQmlError e, component.errors()) {
                   qDebug("   line %d: %s", e.line(), qPrintable(e.description()));
                   }
-            return;
+            return false;
             }
       QmlPlugin* item = qobject_cast<QmlPlugin*>(obj);
+      const bool isQmlPlugin = bool(item);
       if (item) {
             d->version      = item->version();
             d->description  = item->description();
             }
       delete obj;
+      return isQmlPlugin;
       }
 }
 
